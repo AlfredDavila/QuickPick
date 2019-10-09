@@ -1,0 +1,406 @@
+<!-- https://jsfiddle.net/0GiS0/Yvgc2/ Para abrir varios archivos-->
+<!--- https://jsfiddle.net/alano/E8rrX/ Para poner iconos -->
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Quick Pick</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/js/bootstrap.min.js"></script>
+        <script type="text/javascript">
+
+            var steps = ['t0', 't1', 't2', 't3', 'tp', 'ts', 'tc'];
+
+            var current_index = 0;
+            var current_file_index = 0;
+            $(document).ready(function () {
+
+
+                $('input.control')[0].focus();
+
+                $('input.control').on('focus', function (e) {
+                    var id = $(e.target).attr('id');
+
+                    var index = steps.indexOf(id);
+
+                    current_index = index;
+
+                });
+
+                $('button.clear').on('click', function (e) {
+
+                    $('input.seleccionada').removeClass('seleccionada');
+
+                    $('input.control').val('');
+
+                    $('input.control')[0].focus();
+
+                    /*Foco al primer input*/
+                    $('#' + steps[0]).addClass('seleccionada');
+
+                    $('div.marker').remove();
+
+                });
+
+                $('body').on('keyup', function (event) {
+                    var char = event.which || event.keyCode;
+
+                    var RIGHT = 39;
+
+                    var LEFT = 37;
+
+                    if (char == RIGHT || char == LEFT) {
+
+                        /*Elimino las marcas anteriores*/
+                        $('div.marker').remove();
+
+                        var filesInput = document.getElementById("gallery");
+
+                        var delta = -(38 - char);
+                        //para deltas negativos
+                        delta = delta < 0 ? filesInput.files.length - (-delta) % filesInput.files.length : delta;
+
+                        var prev_index = current_file_index;
+
+                        var file_name = filesInput.files[prev_index].name;
+
+                        console.log(file_name);
+
+                        current_file_index = (current_file_index + delta) % filesInput.files.length;
+
+                        var file_name_next = filesInput.files[current_file_index].name;
+
+
+                        imagePrev(filesInput, 'div.imagen', current_file_index);
+
+                        //Leer textbox
+                        var output_val = $('#output').val().trim().length ? $('#output').val() : "[]";
+
+                        var outputJson = JSON.parse(output_val);
+
+                        var updated_out_json;
+
+                        if (outputJson.length) {
+
+                            updated_out_json = deleteRegistro(outputJson, file_name);
+
+                        } else {
+                            updated_out_json = new Array();
+                        }
+
+                        //Agregarlo
+                        var datos = {
+                            't0': $('#t0').val(),
+                            't1': $('#t1').val(),
+                            't2': $('#t2').val(),
+                            't3': $('#t3').val(),
+                            'tp': $('#tp').val(),
+                            'ts': $('#ts').val(),
+                            'tc': $('#tc').val(),
+                            'dt': $('#dt').val(),
+                            file_name: file_name
+                        };
+
+                        updated_out_json.push(datos);
+                        //Cargar la siguiente imagen
+
+                        var json_string = JSON.stringify(updated_out_json);
+                        /*Actualizó la cadena*/
+                        $('#output').val(json_string);
+
+
+                        /*Ahora actualizar los campos si existe el registro*/
+
+                        var reg_img = updated_out_json.find(function (imagen) {
+                            return imagen.file_name === file_name_next;
+                        });
+
+                        /*Aqui lleno los inputs*/
+                        if (reg_img != null) {
+                            console.log('Si existe?');
+                            $.each(reg_img, function (idx, elm) {
+
+                                if ($('#' + idx).length) {
+                                    console.log('#' + idx);
+                                    $('#' + idx).val(elm);
+                                }
+
+                            });
+                        } else {
+                            console.log('No existe?');
+                            $('input.control').val('');
+                        }
+
+
+                    }
+
+                });
+
+                /*Foco al primer input*/
+                $('#' + steps[0]).addClass('seleccionada');
+
+                //$('img').click(function (e) {
+                $('div.imagen').on('click', 'img', function (e) {
+
+                    console.log(this);
+
+                    var next_index = ((current_index + 1) % steps.length);
+
+                    /*Coordenadas en la imagen*/
+                    var offset = $(this).offset();
+
+                    var X = e.pageX - offset.left;
+                    var Y = e.pageY - offset.top;
+
+                    //Actualizo el valor en el input
+                    var current = steps[current_index];
+
+                    var current_id = '#' + current;
+
+                    var next_id = '#' + steps[next_index];
+
+                    var current_marker = current + '_marker';
+
+                    $('input.seleccionada').removeClass('seleccionada');
+
+
+                    $(current_id).val(X);
+
+                    //Actualiza la diferencia de pixeles
+                    if (current_index > 0 && current_index < 4) {
+
+                        var id_diff = '#t' + '' + (current_index - 1) + '' + current_index;
+
+                        var prev_id = '#' + steps[(current_index - 1)];
+
+                        var diff = $(current_id).val() - $(prev_id).val();
+
+                        console.log(id_diff + '--' + diff);
+
+                        $(id_diff).html(diff);
+                    } else if (current_index > 3) {
+
+                        var time = getPixToSeg(X);
+                        $(current_id).val(time);
+                    }
+
+                    /*Pongo la clase seleccionada a la que sigue*/
+                    $(next_id).addClass('seleccionada');
+
+                    console.log('X:' + X + 'Y:' + Y);
+                    /*Borra la marca si ya existia*/
+                    $('#' + current_marker).remove();
+                    var w = 4, h = 100;
+                    $("body").append(
+                            $('<div>', {id: current_marker, class: 'marker'}).css({
+                        position: 'absolute',
+                        top: (e.pageY - (h/2)) + 'px',
+                        left: (e.pageX - (w/2)) + 'px',
+                        width: w + 'px',
+                        height: h + 'px',
+                        background: '#550000'
+                    })
+                            );
+
+                    current_index = (current_index + 1) % steps.length;
+
+                });
+
+                //Check File API support
+                if (window.File && window.FileList && window.FileReader)
+                {
+
+                    $('#gallery').on('change', function () {
+                        imagesPreview(this, 'div.imagenes');
+
+                        imagePrev(this, 'div.imagen', 0);
+
+                        $('input.control').val('');
+                    });
+                } else
+                {
+                    console.log("Your browser does not support File API");
+                }
+
+            });
+
+            function getPixToSeg(x) {
+
+                var delta_time = Number.parseFloat($('#dt').val());
+
+                var pix_0 = Number.parseFloat($('#t0').val());
+
+                var avg_pix_delta = (
+                        Number.parseFloat($('#t1').val()) - Number.parseFloat($('#t0').val())
+                        + Number.parseFloat($('#t2').val()) - Number.parseFloat($('#t1').val())
+                        + Number.parseFloat($('#t3').val()) - Number.parseFloat($('#t2').val())
+                        ) / 3;
+
+
+                return ((delta_time / avg_pix_delta) * (x - pix_0));
+            }
+
+            function deleteRegistro(json_output, fileName) {
+                var res = new Array();
+
+                for (i in json_output) {
+
+                    console.log(json_output[i]['file_name']);
+
+                    if (json_output[i]['file_name'] != fileName) {
+                        res.push(json_output[i]);
+                    }
+
+                }
+                return res;
+            }
+            // Multiple images preview in browser
+            var imagesPreview = function (input, placeToInsertImagePreview) {
+
+                if (input.files) {
+                    var filesAmount = input.files.length;
+
+                    for (i = 0; i < filesAmount; i++) {
+                        var reader = new FileReader();
+
+                        reader.onload = function (event) {
+                            $($.parseHTML('<img>')).attr('src', event.target.result).appendTo(placeToInsertImagePreview);
+                        };
+
+                        reader.readAsDataURL(input.files[i]);
+                    }
+                }
+
+            };
+            // Multiple images preview in browser
+            var imagePrev = function (input, placeToInsertImagePreview, index) {
+
+                if (input.files) {
+
+                    $(placeToInsertImagePreview).html('');
+
+                    var reader = new FileReader();
+
+                    reader.onload = function (event) {
+                        $($.parseHTML('<img>')).attr('src', event.target.result).appendTo(placeToInsertImagePreview);
+                    };
+                    console.log(index + '' + input.files[index]);
+                    reader.readAsDataURL(input.files[index]);
+
+                }
+
+            };
+        </script>
+        <style type="text/css">
+            img.foto {
+                width: 100%;
+            }
+
+            input.seleccionada { 
+                border-color: #66afe9;
+                outline: 0;
+                -webkit-box-shadow: inset 0 1px 1px rgba(0,0,0,.075), 0 0 8px rgba(102,175,233,.6);
+                box-shadow: inset 0 1px 1px rgba(0,0,0,.075), 0 0 8px rgba(102,175,233,.6);
+            }
+
+            div.imagen {
+                padding: 0px;
+            }
+
+            div.imagen img{
+                width: 100%;
+            }
+
+            .form-inline .form-control {
+                width: 100%;
+            }
+
+        </style>
+    </head>
+    <body>
+
+        <div class="container">
+            <div class="jumbotron">
+
+                <div class="row">
+                    <div class="page-header">
+                        <h1>QuickPick</h1>
+                        <p>by @_aDavila</p>
+                    </div>
+                    <div class="form-group col-xs-6 col-md-4">
+                        <label for="files">Selecciona imagenes: </label>
+                        <input id="gallery" type="file" multiple/>
+                    </div>
+                    <div class="form-group col-xs-6 col-md-2">
+                        <label for="dt">Delta T</label>
+                        <input type="number" value='60' class="form-control" id="dt">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-12">
+                        <form class="form-inline">
+
+                            <div class="form-group col-md-1 col-xs-2">
+                                <label for="t0">T0 [px]</label>
+                                <input type="number" class="control form-control" readonly id="t0"> 
+                                <span id="t01" class="delta_pix_dt hidden"></span>
+                            </div>
+                            <div class="form-group col-md-1 col-xs-2">
+                                <label for="t1">T1 [px]</label>
+                                <input type="number" class="control form-control" readonly id="t1">
+                                <span id="t12" class="delta_pix_dt hidden"></span>
+                            </div>    
+                            <div class="form-group col-md-1 col-xs-2">    
+                                <label for="t2">T2 [px]</label>
+                                <input type="number" class="control form-control" readonly id="t2">
+                                <span id="t23" class="delta_pix_dt hidden"></span>
+                            </div>  
+                            <div class="form-group col-md-1 col-xs-2"> 
+                                <label for="t3">T3 [px]</label>
+                                <input type="number" class="control form-control" readonly id="t3">
+                            </div>
+                            <div class="form-group col-md-1 col-xs-2">
+                                <label for="tp">Tp [s]</label>
+                                <input type="number" class="control form-control" readonly id="tp">
+                            </div>
+                            <div class="form-group col-md-1 col-xs-2">
+                                <label for="ts">Ts [s]</label>
+                                <input type="number" class="control form-control" readonly id="ts">
+                            </div>
+                            <div class="form-group col-md-1 col-xs-2">
+                                <label for="tc">Tc [s]</label>
+                                <input type="number" class="control form-control" readonly id="tc">
+                            </div>
+                            <div class="form-group col-md-1 col-xs-2">
+                                <button type="button" class="btn btn-warning btn-lg clear">LIMPIAR</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-12">
+                        <div class="imagen">
+
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="form-group">
+                            <label for="output">Tiempos picados</label>
+                            <textarea class="control form-control" id="output"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-12 imagenes">
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </body>
+</html>
